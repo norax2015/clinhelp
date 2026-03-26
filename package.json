@@ -4,7 +4,8 @@
   "private": true,
   "description": "ClinHelp - AI-powered clinical documentation and workflow platform by Norax Solutions, LLC",
   "workspaces": [
-    "apps/*",
+    "apps/web",
+    "apps/api",
     "packages/*"
   ],
   "scripts": {
