@@ -1,0 +1,23 @@
+node_modules
+.pnpm-store
+.npmrc
+.next
+dist
+build
+out
+*.log
+.turbo
+coverage
+.env
+.env.local
+prisma/migrations
+prisma/*.db
+.expo
+android
+ios
+.vscode
+.idea
+01 Branding
+docs
+deploy-netlify.bat
+deploy-output.txt

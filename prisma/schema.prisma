@@ -1,0 +1,663 @@
+// ClinHelp Database Schema
+// Owner: Norax Solutions, LLC
+// ORM: Prisma 5 | DB: PostgreSQL
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum UserRole {
+  super_admin
+  org_admin
+  provider
+  therapist
+  care_coordinator
+  intake_staff
+  biller
+  viewer
+}
+
+enum SubscriptionTier {
+  starter
+  growth
+  enterprise
+}
+
+enum SubscriptionStatus {
+  active
+  past_due
+  cancelled
+  trialing
+}
+
+enum PatientStatus {
+  active
+  inactive
+  discharged
+  waitlist
+}
+
+enum Sex {
+  male
+  female
+  other
+  unknown
+}
+
+enum EncounterType {
+  intake
+  follow_up
+  therapy
+  med_management
+}
+
+enum VisitMode {
+  in_person
+  telehealth
+  phone
+  async
+}
+
+enum EncounterStatus {
+  scheduled
+  in_progress
+  completed
+  cancelled
+  no_show
+}
+
+enum NoteType {
+  SOAP
+  psych_eval
+  therapy
+  progress
+  mse
+  follow_up
+}
+
+enum NoteStatus {
+  draft
+  pending_review
+  finalized
+  signed
+}
+
+enum ScreeningType {
+  PHQ9
+  GAD7
+  CSSRS
+  AUDIT
+}
+
+enum ScreeningSeverity {
+  none
+  minimal
+  mild
+  moderate
+  moderately_severe
+  severe
+}
+
+enum TaskStatus {
+  pending
+  in_progress
+  completed
+  cancelled
+}
+
+enum TaskPriority {
+  low
+  medium
+  high
+  urgent
+}
+
+enum FileType {
+  audio
+  document
+  image
+}
+
+enum TranscriptStatus {
+  pending
+  processing
+  completed
+  failed
+}
+
+enum DiagnosisStatus {
+  active
+  resolved
+  in_remission
+}
+
+enum MedicationStatus {
+  active
+  discontinued
+  on_hold
+}
+
+enum AuditAction {
+  login
+  logout
+  patient_view
+  patient_create
+  patient_update
+  encounter_create
+  encounter_update
+  note_generate
+  note_update
+  note_finalize
+  note_sign
+  screening_submit
+  task_create
+  task_update
+  file_upload
+  transcript_request
+  admin_change
+  user_invite
+  settings_change
+}
+
+// ─── Models ───────────────────────────────────────────────────────────────────
+
+model Organization {
+  id               String           @id @default(uuid())
+  name             String
+  slug             String           @unique
+  subscriptionTier SubscriptionTier @default(starter)
+  isActive         Boolean          @default(true)
+  logoUrl          String?
+  website          String?
+  phone            String?
+  address          String?
+  city             String?
+  state            String?
+  zip              String?
+  settings         Json?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  users        User[]
+  patients     Patient[]
+  encounters   Encounter[]
+  tasks        Task[]
+  auditLogs    AuditLog[]
+  subscription Subscription?
+  usageMetrics UsageMetric[]
+  noteTemplates NoteTemplate[]
+  dotPhrases   DotPhrase[]
+
+  @@map("organizations")
+}
+
+model User {
+  id             String    @id @default(uuid())
+  organizationId String
+  email          String    @unique
+  passwordHash   String
+  firstName      String
+  lastName       String
+  role           UserRole  @default(viewer)
+  isActive       Boolean   @default(true)
+  npi            String?
+  title          String?
+  specialty      String?
+  avatarUrl      String?
+  lastLoginAt    DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  organization    Organization        @relation(fields: [organizationId], references: [id])
+  encounters      Encounter[]         @relation("ProviderEncounters")
+  notes           Note[]              @relation("ProviderNotes")
+  signedNotes     Note[]              @relation("SignedNotes")
+  screenings      Screening[]
+  createdTasks    Task[]              @relation("CreatedTasks")
+  assignedTasks   Task[]              @relation("AssignedTasks")
+  auditLogs       AuditLog[]
+  noteVersions    NoteVersion[]
+  noteTemplates   NoteTemplate[]      @relation("TemplateCreatedBy")
+  notePreference  UserNotePreference?
+  dotPhrases      DotPhrase[]
+
+  @@index([organizationId])
+  @@index([email])
+  @@map("users")
+}
+
+model Patient {
+  id                    String        @id @default(uuid())
+  organizationId        String
+  mrn                   String
+  status                PatientStatus @default(active)
+  firstName             String
+  lastName              String
+  dateOfBirth           DateTime
+  sex                   Sex           @default(unknown)
+  email                 String?
+  phone                 String?
+  address               String?
+  city                  String?
+  state                 String?
+  zip                   String?
+  emergencyContactName  String?
+  emergencyContactPhone String?
+  primaryProviderId     String?
+  insurancePrimary      String?
+  insuranceId           String?
+  clinicalNotes         String?
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+
+  organization        Organization         @relation(fields: [organizationId], references: [id])
+  demographics        PatientDemographic?
+  encounters          Encounter[]
+  diagnoses           Diagnosis[]
+  medications         Medication[]
+  screenings          Screening[]
+  tasks               Task[]
+  patientInstructions PatientInstruction[]
+  noteRecords         Note[]
+
+  @@unique([organizationId, mrn])
+  @@index([organizationId])
+  @@index([lastName, firstName])
+  @@map("patients")
+}
+
+model PatientDemographic {
+  id                String   @id @default(uuid())
+  patientId         String   @unique
+  race              String?
+  ethnicity         String?
+  preferredLanguage String?
+  interpreter       Boolean  @default(false)
+  housingStatus     String?
+  employmentStatus  String?
+  educationLevel    String?
+  maritalStatus     String?
+  veteranStatus     Boolean?
+  referralSource    String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@map("patient_demographics")
+}
+
+model Encounter {
+  id             String          @id @default(uuid())
+  organizationId String
+  patientId      String
+  providerId     String
+  type           EncounterType
+  visitMode      VisitMode       @default(in_person)
+  status         EncounterStatus @default(scheduled)
+  scheduledAt    DateTime?
+  startedAt      DateTime?
+  completedAt    DateTime?
+  chiefComplaint String?
+  notes          String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  organization        Organization         @relation(fields: [organizationId], references: [id])
+  patient             Patient              @relation(fields: [patientId], references: [id])
+  provider            User                 @relation("ProviderEncounters", fields: [providerId], references: [id])
+  files               EncounterFile[]
+  transcripts         Transcript[]
+  noteRecords         Note[]
+  screenings          Screening[]
+  tasks               Task[]
+  codingSuggestions   CodingSuggestion[]
+  patientInstructions PatientInstruction[]
+
+  @@index([organizationId])
+  @@index([patientId])
+  @@index([providerId])
+  @@index([status])
+  @@map("encounters")
+}
+
+model EncounterFile {
+  id           String   @id @default(uuid())
+  encounterId  String
+  filename     String
+  originalName String
+  mimeType     String
+  size         Int
+  storageKey   String   @unique
+  type         FileType @default(document)
+  createdAt    DateTime @default(now())
+
+  encounter   Encounter    @relation(fields: [encounterId], references: [id])
+  transcripts Transcript[]
+
+  @@index([encounterId])
+  @@map("encounter_files")
+}
+
+model Transcript {
+  id              String           @id @default(uuid())
+  encounterId     String
+  fileId          String?
+  status          TranscriptStatus @default(pending)
+  rawText         String?
+  segments        Json?
+  provider        String           @default("mock")
+  durationSeconds Int?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  encounter Encounter      @relation(fields: [encounterId], references: [id])
+  file      EncounterFile? @relation(fields: [fileId], references: [id])
+
+  @@index([encounterId])
+  @@map("transcripts")
+}
+
+model Note {
+  id                String     @id @default(uuid())
+  encounterId       String
+  patientId         String
+  providerId        String
+  type              NoteType
+  status            NoteStatus @default(draft)
+  content           String
+  structuredContent Json?
+  aiGenerated       Boolean    @default(false)
+  finalizedAt       DateTime?
+  signedAt          DateTime?
+  signedById        String?
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+
+  encounter         Encounter          @relation(fields: [encounterId], references: [id])
+  patient           Patient            @relation(fields: [patientId], references: [id])
+  provider          User               @relation("ProviderNotes", fields: [providerId], references: [id])
+  signedBy          User?              @relation("SignedNotes", fields: [signedById], references: [id])
+  versions          NoteVersion[]
+  codingSuggestions CodingSuggestion[]
+
+  @@index([encounterId])
+  @@index([patientId])
+  @@index([providerId])
+  @@map("notes")
+}
+
+model NoteVersion {
+  id                String   @id @default(uuid())
+  noteId            String
+  content           String
+  structuredContent Json?
+  editedById        String
+  versionNumber     Int
+  createdAt         DateTime @default(now())
+
+  note     Note @relation(fields: [noteId], references: [id])
+  editedBy User @relation(fields: [editedById], references: [id])
+
+  @@index([noteId])
+  @@map("note_versions")
+}
+
+model Screening {
+  id               String            @id @default(uuid())
+  patientId        String
+  encounterId      String?
+  administeredById String
+  type             ScreeningType
+  responses        Json
+  totalScore       Int
+  severity         ScreeningSeverity
+  notes            String?
+  createdAt        DateTime          @default(now())
+
+  patient        Patient    @relation(fields: [patientId], references: [id])
+  encounter      Encounter? @relation(fields: [encounterId], references: [id])
+  administeredBy User       @relation(fields: [administeredById], references: [id])
+
+  @@index([patientId])
+  @@index([encounterId])
+  @@map("screenings")
+}
+
+model Diagnosis {
+  id          String          @id @default(uuid())
+  patientId   String
+  icd10Code   String
+  description String
+  type        String          @default("primary")
+  status      DiagnosisStatus @default(active)
+  onsetDate   DateTime?
+  notes       String?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  patient Patient @relation(fields: [patientId], references: [id])
+
+  @@index([patientId])
+  @@map("diagnoses")
+}
+
+model Medication {
+  id           String           @id @default(uuid())
+  patientId    String
+  name         String
+  dosage       String
+  frequency    String
+  route        String?
+  prescriberId String?
+  startDate    DateTime?
+  endDate      DateTime?
+  status       MedicationStatus @default(active)
+  notes        String?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  patient Patient @relation(fields: [patientId], references: [id])
+
+  @@index([patientId])
+  @@map("medications")
+}
+
+model Task {
+  id             String       @id @default(uuid())
+  organizationId String
+  patientId      String?
+  encounterId    String?
+  assignedToId   String?
+  createdById    String
+  title          String
+  description    String?
+  status         TaskStatus   @default(pending)
+  priority       TaskPriority @default(medium)
+  dueDate        DateTime?
+  completedAt    DateTime?
+  aiGenerated    Boolean      @default(false)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  patient      Patient?     @relation(fields: [patientId], references: [id])
+  encounter    Encounter?   @relation(fields: [encounterId], references: [id])
+  assignedTo   User?        @relation("AssignedTasks", fields: [assignedToId], references: [id])
+  createdBy    User         @relation("CreatedTasks", fields: [createdById], references: [id])
+
+  @@index([organizationId])
+  @@index([patientId])
+  @@index([assignedToId])
+  @@index([status])
+  @@map("tasks")
+}
+
+model CodingSuggestion {
+  id                  String   @id @default(uuid())
+  encounterId         String
+  noteId              String?
+  icd10Codes          Json
+  emLevel             String?
+  emRationale         String?
+  completenessPrompts Json
+  status              String   @default("pending_review")
+  reviewedById        String?
+  aiGenerated         Boolean  @default(true)
+  createdAt           DateTime @default(now())
+
+  encounter Encounter @relation(fields: [encounterId], references: [id])
+  note      Note?     @relation(fields: [noteId], references: [id])
+
+  @@index([encounterId])
+  @@map("coding_suggestions")
+}
+
+model PatientInstruction {
+  id                   String    @id @default(uuid())
+  encounterId          String
+  patientId            String
+  content              String
+  followUpDate         DateTime?
+  followUpInstructions String?
+  medicationChanges    String?
+  warningSignsToWatch  String?
+  aiGenerated          Boolean   @default(true)
+  createdAt            DateTime  @default(now())
+
+  encounter Encounter @relation(fields: [encounterId], references: [id])
+  patient   Patient   @relation(fields: [patientId], references: [id])
+
+  @@index([encounterId])
+  @@index([patientId])
+  @@map("patient_instructions")
+}
+
+model AuditLog {
+  id             String      @id @default(uuid())
+  organizationId String
+  userId         String?
+  action         AuditAction
+  resourceType   String?
+  resourceId     String?
+  ipAddress      String?
+  userAgent      String?
+  metadata       Json?
+  createdAt      DateTime    @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  user         User?        @relation(fields: [userId], references: [id])
+
+  @@index([organizationId])
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+model Subscription {
+  id                   String             @id @default(uuid())
+  organizationId       String             @unique
+  tier                 SubscriptionTier   @default(starter)
+  status               SubscriptionStatus @default(trialing)
+  currentPeriodStart   DateTime           @default(now())
+  currentPeriodEnd     DateTime
+  cancelAtPeriodEnd    Boolean            @default(false)
+  stripeSubscriptionId String?
+  stripeCustomerId     String?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@map("subscriptions")
+}
+
+model UsageMetric {
+  id             String   @id @default(uuid())
+  organizationId String
+  metric         String
+  value          Int
+  periodStart    DateTime
+  periodEnd      DateTime
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId, metric, periodStart])
+  @@map("usage_metrics")
+}
+
+model DemoRequest {
+  id           String   @id @default(uuid())
+  name         String
+  email        String
+  organization String
+  specialty    String?
+  providers    String?
+  message      String?
+  createdAt    DateTime @default(now())
+
+  @@map("demo_requests")
+}
+
+model NoteTemplate {
+  id                 String   @id @default(uuid())
+  organizationId     String
+  name               String
+  noteType           String
+  specialty          String?
+  visitType          String?
+  sectionSchema      Json     @default("[]")
+  customInstructions String?
+  isDefault          Boolean  @default(false)
+  isShared           Boolean  @default(true)
+  createdById        String
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  createdBy    User         @relation("TemplateCreatedBy", fields: [createdById], references: [id])
+
+  @@map("note_templates")
+}
+
+model UserNotePreference {
+  id                   String   @id @default(uuid())
+  userId               String   @unique
+  defaultNoteType      String?
+  defaultSpecialty     String?
+  preferredSectionOrder Json?
+  signatureBlock       String?
+  customInstructions   String?
+  tonePreference       String?
+  autoSave             Boolean  @default(true)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("user_note_preferences")
+}
+
+model DotPhrase {
+  id             String   @id @default(uuid())
+  userId         String
+  organizationId String
+  trigger        String
+  expansion      String
+  category       String?
+  createdAt      DateTime @default(now())
+
+  user         User         @relation(fields: [userId], references: [id])
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@map("dot_phrases")
+}

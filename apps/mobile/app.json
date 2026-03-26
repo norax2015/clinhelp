@@ -1,0 +1,25 @@
+{
+  "expo": {
+    "name": "ClinHelp",
+    "slug": "clinhelp",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "backgroundColor": "#0F1F3D"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.noraxsolutions.clinhelp"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#0F1F3D"
+      },
+      "package": "com.noraxsolutions.clinhelp"
+    },
+    "scheme": "clinhelp",
+    "plugins": ["expo-router", "expo-secure-store"]
+  }
+}
