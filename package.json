@@ -3,7 +3,6 @@
   "version": "0.1.0",
   "private": true,
   "description": "ClinHelp - AI-powered clinical documentation and workflow platform by Norax Solutions, LLC",
-  "packageManager": "pnpm@9.0.0",
   "workspaces": [
     "apps/*",
     "packages/*"
