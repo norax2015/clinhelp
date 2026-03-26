@@ -4,11 +4,11 @@
 
 [build.environment]
   NODE_VERSION                     = "20"
-  PNPM_VERSION                     = "9"
   NEXT_TELEMETRY_DISABLED          = "1"
   CI                               = "true"
   PRISMA_SKIP_POSTINSTALL_GENERATE = "true"
   COREPACK_ENABLE_STRICT           = "0"
+  PNPM_FLAGS                       = "--shamefully-hoist --no-strict-peer-dependencies --no-frozen-lockfile"
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
