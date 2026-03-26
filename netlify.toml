@@ -1,9 +1,10 @@
 [build]
-  command = "corepack enable && corepack prepare pnpm@9 --activate && pnpm install --shamefully-hoist --no-strict-peer-dependencies --no-frozen-lockfile && pnpm --filter @clinhelp/web build"
+  command = "pnpm install --shamefully-hoist --no-strict-peer-dependencies --no-frozen-lockfile && pnpm --filter @clinhelp/web build"
   publish = "apps/web/.next"
 
 [build.environment]
   NODE_VERSION                     = "20"
+  PNPM_VERSION                     = "9"
   NEXT_TELEMETRY_DISABLED          = "1"
   CI                               = "true"
   PRISMA_SKIP_POSTINSTALL_GENERATE = "true"
